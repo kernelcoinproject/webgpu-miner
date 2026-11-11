@@ -1,0 +1,9 @@
+# Mount the miner at /miner/ alongside the existing pool site.
+pool.kernelcoin.org {
+	@miner path /miner
+	redir @miner /miner/ 308
+	handle_path /miner/* {
+		reverse_proxy 127.0.0.1:8787
+	}
+	reverse_proxy 127.0.0.1:8080
+}

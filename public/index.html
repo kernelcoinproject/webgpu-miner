@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111827"><title>Kernelcoin WebGPU Miner</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="shell">
+    <header><div class="eyebrow">KERNELCOIN</div><h1>WebGPU Miner</h1><p>Mine pool shares from a WebGPU-capable browser.</p></header>
+    <section class="panel">
+      <label for="wallet">Kernelcoin wallet address</label>
+      <input id="wallet" autocomplete="off" autocapitalize="off" spellcheck="false" value="KNkebi6ybfjBUQmZic4naE4rSDjQC1N4AS" placeholder="Paste your wallet address">
+      <label for="worker">Worker name <span>(optional)</span></label>
+      <input id="worker" autocomplete="off" value="phone" maxlength="32">
+      <button id="toggle" disabled>Checking WebGPU…</button>
+      <div id="status" role="status">WebGPU status pending.</div>
+    </section>
+    <section class="stats" aria-live="polite">
+      <div><span>Hashrate</span><strong id="rate">—</strong></div>
+      <div><span>Shares accepted</span><strong id="accepted">0</strong></div>
+      <div><span>Shares rejected</span><strong id="rejected">0</strong></div>
+    </section>
+    <details><summary>Connection details</summary><p>The local bridge forwards Stratum V1 to <code>pool.kernelcoin.org:3333</code>. The browser page must stay open while mining. WebGPU is available in secure contexts such as localhost and HTTPS. Mobile browsers may pause or throttle GPU work in the background.</p></details>
+    <footer>Pool: <a href="https://pool.kernelcoin.org/" target="_blank" rel="noreferrer">pool.kernelcoin.org</a> · Scrypt N=1024, r=1, p=1</footer>
+  </main>
+  <script src="./scrypt_webgpu.js"></script><script type="module" src="./app.js"></script>
+</body>
+</html>
