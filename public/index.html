@@ -13,6 +13,8 @@
       <input id="wallet" autocomplete="off" autocapitalize="off" spellcheck="false" value="KNkebi6ybfjBUQmZic4naE4rSDjQC1N4AS" placeholder="Paste your wallet address">
       <label for="worker">Worker name <span>(optional)</span></label>
       <input id="worker" autocomplete="off" value="phone" maxlength="32">
+      <label for="gpu-batch-size">GPU batch size <span>(hashes per batch)</span></label>
+      <select id="gpu-batch-size" disabled><option value="256">256 hashes (32 MiB)</option></select>
       <button id="toggle" disabled>Checking WebGPU…</button>
       <div id="status" role="status">WebGPU status pending.</div>
     </section>
@@ -21,7 +23,7 @@
       <div><span>Shares accepted</span><strong id="accepted">0</strong></div>
       <div><span>Shares rejected</span><strong id="rejected">0</strong></div>
     </section>
-    <details><summary>Temporary GPU capacity check</summary><p id="gpu-capacity">Checking WebGPU adapter limits…</p></details>
+    <details><summary>GPU capacity details</summary><p id="gpu-capacity">Checking WebGPU adapter limits…</p></details>
     <details><summary>Connection details</summary><p>The local bridge forwards Stratum V1 to <code>pool.kernelcoin.org:3333</code>. The browser page must stay open while mining. WebGPU is available in secure contexts such as localhost and HTTPS. Mobile browsers may pause or throttle GPU work in the background.</p></details>
     <footer>Pool: <a href="https://pool.kernelcoin.org/" target="_blank" rel="noreferrer">pool.kernelcoin.org</a> · Scrypt N=1024, r=1, p=1</footer>
   </main>

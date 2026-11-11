@@ -2,6 +2,8 @@ const $ = id => document.getElementById(id);
 const DEFAULT_WALLET = 'KNkebi6ybfjBUQmZic4naE4rSDjQC1N4AS';
 const button = $('toggle');
 const status = $('status');
+const batchSizeSelect = $('gpu-batch-size');
+let batchSizeAvailable = false;
 let running = false;
 let stopped = false;
 let miner;
@@ -21,19 +23,37 @@ let rateStart = 0;
 const pending = new Map();
 
 function say(message) { status.textContent = message; }
+function formatBatchSize(batchSize) { return `${batchSize.toLocaleString()} hashes (${(batchSize / 8).toLocaleString()} MiB scratch)`; }
+function updateGpuCapacityText(limits, theoreticalMaxBatch) {
+  const selectedBatch = Number(batchSizeSelect.value);
+  const maxScratchBytes = Math.min(limits.maxStorageBufferBindingSize, limits.maxBufferSize);
+  const maxMiB = (maxScratchBytes / (1024 * 1024)).toLocaleString(undefined, { maximumFractionDigits: 1 });
+  $('gpu-capacity').textContent = `Adapter limits: max storage binding ${limits.maxStorageBufferBindingSize.toLocaleString()} B; max buffer ${limits.maxBufferSize.toLocaleString()} B. Theoretical ceiling: ${theoreticalMaxBatch.toLocaleString()} hashes per batch (${maxMiB} MiB scratch). Selected batch: ${formatBatchSize(selectedBatch)}. Theoretical limit is not a guarantee of safe allocation or best speed.`;
+}
 async function showGpuCapacity() {
   const output = $('gpu-capacity');
-  if (!navigator.gpu) { output.textContent = 'WebGPU is unavailable in this browser.'; return; }
+  if (!navigator.gpu) { output.textContent = 'WebGPU is unavailable in this browser.'; batchSizeSelect.disabled = true; return; }
   try {
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-    if (!adapter) { output.textContent = 'No WebGPU adapter was found.'; return; }
+    if (!adapter) { output.textContent = 'No WebGPU adapter was found.'; batchSizeSelect.disabled = true; return; }
     const limits = adapter.limits;
     const bytesPerNonce = 128 * 1024;
     const maxScratchBytes = Math.min(limits.maxStorageBufferBindingSize, limits.maxBufferSize);
     const theoreticalMaxBatch = Math.floor(maxScratchBytes / bytesPerNonce);
-    const maxMiB = (maxScratchBytes / (1024 * 1024)).toLocaleString(undefined, { maximumFractionDigits: 1 });
-    output.textContent = `Adapter limits: max storage binding ${limits.maxStorageBufferBindingSize.toLocaleString()} B; max buffer ${limits.maxBufferSize.toLocaleString()} B. Theoretical ceiling: ${theoreticalMaxBatch.toLocaleString()} hashes per batch (${maxMiB} MiB scratch). Current miner cap: 256 hashes (32 MiB). Theoretical limit is not a guarantee of safe allocation or best speed.`;
-  } catch (error) { output.textContent = `Could not read WebGPU limits: ${error.message}`; }
+    const choices = [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192].filter(size => size <= theoreticalMaxBatch);
+    if (!choices.length) throw new Error('The adapter does not support the minimum 32-hash batch.');
+    batchSizeSelect.replaceChildren(...choices.map(size => {
+      const option = document.createElement('option');
+      option.value = String(size);
+      option.textContent = formatBatchSize(size);
+      return option;
+    }));
+    batchSizeSelect.value = String(choices.includes(256) ? 256 : choices[choices.length - 1]);
+    batchSizeAvailable = true;
+    batchSizeSelect.disabled = running;
+    updateGpuCapacityText(limits, theoreticalMaxBatch);
+    batchSizeSelect.addEventListener('change', () => updateGpuCapacityText(limits, theoreticalMaxBatch));
+  } catch (error) { output.textContent = `Could not read WebGPU limits: ${error.message}`; batchSizeSelect.disabled = true; }
 }
 function walletAddress() { return $('wallet').value.trim() || DEFAULT_WALLET; }
 function minerUsername() { return walletAddress() + ($('worker').value.trim() ? `.${$('worker').value.trim()}` : ''); }
@@ -142,18 +162,18 @@ async function start() {
   button.disabled=true;
   try {
     lastBridgeError = '';
-    miner = await createScryptWebGpuMiner();
+    miner = await createScryptWebGpuMiner(Number(batchSizeSelect.value));
     const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const appPath = location.pathname.replace(/\/+$/, '');
     socket = new WebSocket(`${scheme}//${location.host}${appPath}/stratum`);
     socket.addEventListener('message',onMessage);
     socket.addEventListener('error',()=>say('Could not connect to the local Stratum bridge. Start the Node server and reload this page.'));
     socket.addEventListener('close',()=>{ if(running) say(lastBridgeError ? `Pool connection failed: ${lastBridgeError}. Check that Stratum is listening.` : 'Connection closed. Stop and start mining to reconnect.'); });
-    running=true; stopped=false; rateStart=performance.now();
+    running=true; stopped=false; rateStart=performance.now(); batchSizeSelect.disabled=true;
     button.textContent='Stop mining'; button.disabled=false; button.classList.add('stop');
     say('Connecting to the Kernelcoin pool…');
     scan().catch(err=>{ say(`Mining stopped: ${err.message}`); stop(); });
-  } catch(err) { say(err.message); button.disabled=false; }
+  } catch(err) { say(err.message); button.disabled=false; batchSizeSelect.disabled=!batchSizeAvailable; }
 }
 function stop() {
   running=false; stopped=true;
@@ -161,6 +181,7 @@ function stop() {
   miner=undefined;
   if(socket && socket.readyState < WebSocket.CLOSING) socket.close();
   socket=undefined; currentJob=undefined;
+  batchSizeSelect.disabled=!batchSizeAvailable;
   button.textContent='Start mining'; button.disabled=false; button.classList.remove('stop');
   $('rate').textContent='—'; say('Mining stopped.');
 }

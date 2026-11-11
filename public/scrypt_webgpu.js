@@ -96,19 +96,26 @@ fn mine_scrypt(@builtin(global_invocation_id) gid:vec3<u32>){
 `;
 
 const SCRYPT_WEBGPU_PARAMS = '';
-async function createScryptWebGpuMiner() {
+async function createScryptWebGpuMiner(requestedBatchSize = 256) {
     if (!navigator.gpu) throw new Error('WebGPU is unavailable in this browser. Open the page on localhost and use a WebGPU-capable browser.');
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
     if (!adapter) throw new Error('No WebGPU adapter was found.');
-    const device = await adapter.requestDevice();
+    const bytesPerNonce = 32768 * 4;
+    const maxBatchSize = Math.floor(Math.min(adapter.limits.maxStorageBufferBindingSize, adapter.limits.maxBufferSize) / bytesPerNonce);
+    const batchSize = Math.max(1, Math.min(Math.floor(Number(requestedBatchSize) || 256), maxBatchSize));
+    const scratchBytes = batchSize * bytesPerNonce;
+    let device;
+    try {
+        device = await adapter.requestDevice({ requiredLimits: { maxStorageBufferBindingSize: scratchBytes, maxBufferSize: scratchBytes } });
+    } catch (error) {
+        throw new Error(`Could not request a GPU device for ${batchSize} hashes per batch: ${error.message}`);
+    }
     const shader = device.createShaderModule({ code: SCRYPT_WEBGPU_PARAMS + SCRYPT_WEBGPU_SHADER });
     const info = await shader.getCompilationInfo();
     const errors = info.messages.filter(message => message.type === 'error');
     if (errors.length) { device.destroy(); throw new Error(errors.map(m => `${m.lineNum}:${m.linePos} ${m.message}`).join('\n')); }
     const pipeline = await device.createComputePipelineAsync({ layout: 'auto', compute: { module: shader, entryPoint: 'mine_scrypt' } });
-    // Each nonce needs 128 KiB of ROMix scratch. Keep mobile allocations modest.
-    const maxByBinding = Math.floor((device.limits.maxStorageBufferBindingSize || 128 * 1024 * 1024) / (32768 * 4));
-    const batchSize = Math.max(1, Math.min(256, maxByBinding));
+    // Each nonce needs 128 KiB of ROMix scratch; the selected batch controls allocation size.
     const headerBuffer = device.createBuffer({ size: 19*4, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST });
     const targetBuffer = device.createBuffer({ size: 32*4, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST });
     const resultBuffer = device.createBuffer({ size: 40, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC|GPUBufferUsage.COPY_DST });
@@ -119,6 +126,7 @@ async function createScryptWebGpuMiner() {
     const head = new Uint32Array(19); const headView = new DataView(head.buffer); const targetWords = new Uint32Array(8);
     const zero = new Uint32Array(10); const result = new Uint32Array(10); let closed=false;
     return {
+        batchSize,
         async mineBatch(baseHeader,target,startNonce) {
             if(closed) throw new Error('WebGPU scrypt miner is closed.');
             for(let i=0;i<19;i++) headView.setUint32(i*4,(baseHeader[i*4]|(baseHeader[i*4+1]<<8)|(baseHeader[i*4+2]<<16)|(baseHeader[i*4+3]<<24))>>>0,true);
