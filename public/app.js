@@ -21,6 +21,20 @@ let rateStart = 0;
 const pending = new Map();
 
 function say(message) { status.textContent = message; }
+async function showGpuCapacity() {
+  const output = $('gpu-capacity');
+  if (!navigator.gpu) { output.textContent = 'WebGPU is unavailable in this browser.'; return; }
+  try {
+    const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+    if (!adapter) { output.textContent = 'No WebGPU adapter was found.'; return; }
+    const limits = adapter.limits;
+    const bytesPerNonce = 128 * 1024;
+    const maxScratchBytes = Math.min(limits.maxStorageBufferBindingSize, limits.maxBufferSize);
+    const theoreticalMaxBatch = Math.floor(maxScratchBytes / bytesPerNonce);
+    const maxMiB = (maxScratchBytes / (1024 * 1024)).toLocaleString(undefined, { maximumFractionDigits: 1 });
+    output.textContent = `Adapter limits: max storage binding ${limits.maxStorageBufferBindingSize.toLocaleString()} B; max buffer ${limits.maxBufferSize.toLocaleString()} B. Theoretical ceiling: ${theoreticalMaxBatch.toLocaleString()} hashes per batch (${maxMiB} MiB scratch). Current miner cap: 256 hashes (32 MiB). Theoretical limit is not a guarantee of safe allocation or best speed.`;
+  } catch (error) { output.textContent = `Could not read WebGPU limits: ${error.message}`; }
+}
 function walletAddress() { return $('wallet').value.trim() || DEFAULT_WALLET; }
 function minerUsername() { return walletAddress() + ($('worker').value.trim() ? `.${$('worker').value.trim()}` : ''); }
 function hexBytes(hex) { if (!/^(?:[0-9a-f]{2})*$/i.test(hex)) throw new Error('Pool supplied malformed hex data.'); return Uint8Array.from(hex.match(/.{2}/g) ?? [], b => parseInt(b,16)); }
@@ -151,5 +165,6 @@ function stop() {
   $('rate').textContent='—'; say('Mining stopped.');
 }
 button.addEventListener('click',()=>running?stop():start());
+showGpuCapacity();
 if (navigator.gpu) { button.textContent='Start mining'; button.disabled=false; say('WebGPU is available. Start mining to connect.'); }
 else { button.textContent='WebGPU unavailable'; button.disabled=true; say('This browser does not expose WebGPU.'); }
