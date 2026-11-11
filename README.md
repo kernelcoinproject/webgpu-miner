@@ -23,7 +23,7 @@ The server listens only on `127.0.0.1` by default and only allows same-origin We
 
 WebGPU requires a secure browser context. `localhost` works on the computer running the app, but on a phone `localhost` means the phone itself. To use a server on your computer, put it behind HTTPS on a hostname reachable from the phone and proxy both HTTP and WebSocket traffic to `127.0.0.1:8787`. Keep the browser tab open and the screen awake; mobile operating systems may throttle or suspend background GPU work.
 
-The mobile UI uses a smaller 128-lane batch to limit scratch storage. Each Scrypt nonce uses 128 KiB of GPU scratch memory, so a 128-nonce batch needs up to 16 MiB. Actual speed and battery/thermal behavior depend on the phone and browser.
+The mobile UI uses a batch of up to 256 lanes. Each Scrypt nonce uses 128 KiB of GPU scratch memory, so a 256-nonce batch needs up to 32 MiB. The batch is clamped to the device's reported storage-buffer limit. Actual speed and battery/thermal behavior depend on the phone and browser.
 
 ## Pool job implementation
 

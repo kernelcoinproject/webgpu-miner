@@ -107,9 +107,8 @@ async function createScryptWebGpuMiner() {
     if (errors.length) { device.destroy(); throw new Error(errors.map(m => `${m.lineNum}:${m.linePos} ${m.message}`).join('\n')); }
     const pipeline = await device.createComputePipelineAsync({ layout: 'auto', compute: { module: shader, entryPoint: 'mine_scrypt' } });
     // Each nonce needs 128 KiB of ROMix scratch. Keep mobile allocations modest.
-    const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
     const maxByBinding = Math.floor((device.limits.maxStorageBufferBindingSize || 128 * 1024 * 1024) / (32768 * 4));
-    const batchSize = Math.max(1, Math.min(mobile ? 128 : 256, maxByBinding));
+    const batchSize = Math.max(1, Math.min(256, maxByBinding));
     const headerBuffer = device.createBuffer({ size: 19*4, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST });
     const targetBuffer = device.createBuffer({ size: 32*4, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST });
     const resultBuffer = device.createBuffer({ size: 40, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC|GPUBufferUsage.COPY_DST });
